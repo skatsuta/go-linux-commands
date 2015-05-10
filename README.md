@@ -1,2 +1,3 @@
-# go-coreutils
-Coreutils written in Go.
+# go-linux-commands
+
+Linux commands written in Go.
