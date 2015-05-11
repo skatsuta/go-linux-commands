@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 )
 
@@ -11,12 +10,11 @@ type stat struct {
 }
 
 func (s *stat) String() string {
-	format := `
-type	%v
+	format := `type	%v
 size	%v
 mode	%v
 modTime	%v
-sys	%#v
+sys	%+v
 `
 
 	return fmt.Sprintf(format, s.fi.Name(), s.fi.Size(), s.fi.Mode(), s.fi.ModTime(), s.fi.Sys())
@@ -39,18 +37,6 @@ func main() {
 	}
 
 	fmt.Println(newStat(fi))
-}
-
-func doLs(path string) {
-	fis, err := ioutil.ReadDir(path)
-	if err != nil {
-		perror(err)
-		return
-	}
-
-	for _, fi := range fis {
-		fmt.Printf("%s\n", fi.Name())
-	}
 }
 
 func perror(err error) {
