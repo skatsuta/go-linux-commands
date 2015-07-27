@@ -8,6 +8,8 @@ import (
 )
 
 func main() {
+	// flags
+	notCreate := flag.Bool("c", false, "do not create the file if it does not exist")
 	flag.Parse()
 
 	args := flag.Args()
@@ -15,8 +17,10 @@ func main() {
 	// check if files exist
 	for _, f := range args {
 		if _, e := os.Lstat(f); os.IsNotExist(e) {
-			if _, err := os.Create(f); err != nil {
-				perror(err)
+			if !*notCreate {
+				if _, err := os.Create(f); err != nil {
+					perror(err)
+				}
 			}
 			continue
 		}
