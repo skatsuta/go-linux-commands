@@ -26,35 +26,42 @@ func main() {
 
 	l := len(flag.Args())
 
+	// read stdin
 	if l == 0 {
-		doHead(os.Stdin, nlines)
-		return
+		err := head(os.Stdin, os.Stdout, nlines)
+		if err != nil {
+			printErr(err)
+			return
+		}
 	}
 
+	// read files
 	for _, path := range flag.Args() {
 		fp, err := os.Open(path)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "%v", err)
+			printErr(err)
 			return
 		}
 		defer func() {
 			if e := fp.Close(); e != nil {
-				fmt.Fprintf(os.Stderr, "%v", err)
-				return
+				printErr(e)
 			}
 		}()
 
-		doHead(fp, nlines)
+		if e := head(fp, os.Stdout, nlines); e != nil {
+			printErr(e)
+			return
+		}
 	}
 }
 
-func doHead(fp *os.File, nlines int) {
-	if nlines <= 0 {
-		return
+func head(in io.Reader, out io.Writer, n int) error {
+	if n <= 0 {
+		return fmt.Errorf("illegal line count -- %d", n)
 	}
 
-	r := bufio.NewReader(fp)
-	w := bufio.NewWriter(os.Stdout)
+	r := bufio.NewReader(in)
+	w := bufio.NewWriter(out)
 
 	for {
 		c, err := r.ReadByte()
@@ -63,25 +70,24 @@ func doHead(fp *os.File, nlines int) {
 		}
 
 		if e := w.WriteByte(c); e != nil {
-			fmt.Fprintln(os.Stderr, e.Error())
-			os.Exit(1)
+			return e
 		}
 
 		if c == '\n' {
 			if e := w.Flush(); e != nil {
-				fmt.Fprintf(os.Stderr, "%v", err)
-				return
+				return e
 			}
 
-			nlines--
-			if nlines == 0 {
-				return
+			n--
+			if n == 0 {
+				return nil
 			}
 		}
 	}
 
-	if err := w.Flush(); err != nil {
-		fmt.Fprintf(os.Stderr, "%v", err)
-		return
-	}
+	return w.Flush()
+}
+
+func printErr(err error) {
+	_, _ = fmt.Fprintf(os.Stderr, "head: %v\n", err)
 }
