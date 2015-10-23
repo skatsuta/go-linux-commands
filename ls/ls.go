@@ -3,8 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -38,15 +40,16 @@ func main() {
 	}
 
 	for _, path := range paths {
-		doLs(path, opt)
+		if e := ls(os.Stdout, path, opt); e != nil {
+			perror(e)
+		}
 	}
 }
 
-func doLs(path string, opt option) {
+func ls(out io.Writer, path string, opt option) error {
 	fis, err := ioutil.ReadDir(path)
 	if err != nil {
-		perror(err)
-		return
+		return err
 	}
 
 	for _, fi := range fis {
@@ -58,15 +61,19 @@ func doLs(path string, opt option) {
 			continue
 		}
 
-		fmt.Println(name)
+		fmt.Fprintln(out, name)
 
 		// run recursively
 		isRec := opt.rec && fi.IsDir()
 		if isRec {
-			name = path + "/" + name
-			doLs(name, opt)
+			name = filepath.Join(path, name)
+			if e := ls(out, name, opt); e != nil {
+				return e
+			}
 		}
 	}
+
+	return nil
 }
 
 func isHidden(path string) bool {
@@ -74,5 +81,5 @@ func isHidden(path string) bool {
 }
 
 func perror(err error) {
-	fmt.Fprintf(os.Stderr, "[error] %v\n", err)
+	fmt.Fprintf(os.Stderr, "ls: %v\n", err)
 }
