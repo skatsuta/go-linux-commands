@@ -9,75 +9,64 @@ import (
 )
 
 const (
-	dispEnd = `$\n`
-	dispTab = "> "
+	endMark = "$\n"
+	tabMark = "^I"
 )
 
-type replacer interface {
-	replace(b byte) string
-}
-
-type disp struct {
-	end bool
-	tab bool
-}
-
-func (d *disp) replace(b byte) string {
-	if b == '\n' && d.end {
-		return dispEnd
-	}
-
-	if b == '\t' && d.tab {
-		return dispTab
-	}
-
-	return string(b)
-}
-
-func newDisp() *disp {
-	d := new(disp)
-
-	// define flags
-	flag.BoolVar(&d.end, "e", false, "display a dollar sign (`"+dispEnd+"`) at the end of each line")
-	flag.BoolVar(&d.tab, "t", false, "display tab characters as `"+dispTab+"`")
-	flag.Parse()
-	flag.Usage = usage
-
-	return d
-}
+var (
+	showAll  = flag.Bool("A", false, "equivalent to -ET")
+	showEnds = flag.Bool("E", false, "display $ at end of each line")
+	showTabs = flag.Bool("T", false, "display TAB characters as "+string(tabMark))
+)
 
 func main() {
-	d := newDisp()
+	flag.Parse()
+
+	if *showAll {
+		*showEnds = true
+		*showTabs = true
+	}
 
 	files := flag.Args()
 
-	if len(files) < 1 {
-		if e := doCat(os.Stdin, d); e != nil {
-			die(e)
-		}
-		return
+	if len(files) == 0 {
+		// append a hyphen as stdin
+		files = append(files, "-")
 	}
 
 	for _, file := range files {
-		fp, err := os.Open(file)
-		if err != nil {
-			die(err)
+		var err error
+		if file == "-" {
+			err = cat(os.Stdin, os.Stdout)
+		} else {
+			err = catFile(file)
 		}
-		defer func() {
-			if e := fp.Close(); e != nil {
-				die(e)
-			}
-		}()
 
-		if e := doCat(fp, d); e != nil {
-			die(e)
+		if err != nil {
+			printErr(err)
 		}
 	}
 }
 
-func doCat(fp *os.File, rpl replacer) error {
-	r := bufio.NewReader(fp)
-	w := bufio.NewWriter(os.Stdout)
+func catFile(fileName string) error {
+	file, err := os.Open(fileName)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	if stat, err := file.Stat(); err != nil {
+		return err
+	} else if stat.IsDir() {
+		return fmt.Errorf("%s: Is a directory", stat.Name())
+	}
+
+	return cat(file, os.Stdout)
+}
+
+func cat(rd io.Reader, wt io.Writer) error {
+	r := bufio.NewReader(rd)
+	w := bufio.NewWriter(wt)
 
 	for {
 		c, err := r.ReadByte()
@@ -85,32 +74,28 @@ func doCat(fp *os.File, rpl replacer) error {
 			break
 		}
 
-		s := rpl.replace(c)
+		switch {
+		case c == '\n' && *showEnds:
+			_, err = w.WriteString(endMark)
+		case c == '\t' && *showTabs:
+			_, err = w.WriteString(tabMark)
+		default:
+			err = w.WriteByte(c)
+		}
 
-		if _, e := w.WriteString(s); e != nil {
-			return e
+		if err != nil {
+			w.Flush()
+			return err
 		}
 
 		if c == '\n' {
-			if e := w.Flush(); e != nil {
-				return e
-			}
+			w.Flush()
 		}
 	}
 
 	return w.Flush()
 }
 
-func die(err error) {
-	if err == nil {
-		return
-	}
-
-	fmt.Fprintf(os.Stderr, "%v\n", err)
-	os.Exit(1)
-}
-
-func usage() {
-	fmt.Fprintf(os.Stderr, "Usage of %s [-et] [file ...]:\n", os.Args[0])
-	flag.PrintDefaults()
+func printErr(err error) {
+	fmt.Fprintf(os.Stderr, "%s: %v\n", os.Args[0], err)
 }
