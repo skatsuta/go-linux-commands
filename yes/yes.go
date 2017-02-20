@@ -3,15 +3,18 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 )
 
-func main() {
-	s := "y"
+const defaultArg = "y"
 
-	if len(os.Args) > 1 {
-		s = os.Args[1]
+func main() {
+	args := os.Args[1:]
+	if len(args) == 0 {
+		args = append(args, defaultArg)
 	}
 
+	s := strings.Join(args, " ")
 	for {
 		fmt.Println(s)
 	}
